@@ -7,6 +7,7 @@
 #include "helpers.h"
 
 int dir_offsets[8] = {8, 9, 1, -7, -8, -9, -1, 7};
+int num_squares_to_edge[64][8];
 int CHESS_CONSTANTS_INITIALIZED = 0;
 int KNIGHT_MOVE[8][2] = {
     {-2, -1}, {-2, 1}, {2, -1}, {2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2},

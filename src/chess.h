@@ -8,9 +8,9 @@
  * @brief Offset on chess board starting from UP, going clockwise
  *
  */
-int dir_offsets[8];
-int num_squares_to_edge[64][8];
-int CHESS_CONSTANTS_INITIALIZED;
+extern int dir_offsets[8];
+extern int num_squares_to_edge[64][8];
+extern int CHESS_CONSTANTS_INITIALIZED;
 
 typedef struct chess_s {
     char board[64];
