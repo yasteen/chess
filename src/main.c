@@ -5,12 +5,21 @@
 #include "chess.h"
 
 void print_chess_board(char board[64], int is_number) {
+    puts("+---+---+---+---+---+---+---+---+");
     for (int y = 7; y >= 0; y--) {
+        putc('|', stdout);
         for (int x = 0; x < 8; x++) {
-            putc((is_number ? '0' : 0) + board[8 * y + x], stdout);
-            putc(' ', stdout);
+            if (!is_number || board[8 * y + x] < 100) putc(' ', stdout);
+            if (is_number)
+                printf("%d", board[8 * y + x]);
+            else
+                putc((is_number ? '0' : 0) + board[8 * y + x], stdout);
+            if (!is_number || board[8 * y + x] < 10) putc(' ', stdout);
+            putc('|', stdout);
         }
+        putc(' ', stdout);
         putc('\n', stdout);
+        puts("+---+---+---+---+---+---+---+---+");
     }
 }
 

@@ -14,7 +14,12 @@ int CHESS_CONSTANTS_INITIALIZED;
 
 typedef struct chess_s {
     char board[64];
-    // 1: targeted; 2: pinned to king; 3: stops check
+
+    // 1: targeted;
+    // 2: still dangerous for king to go to if in check
+    // 3: stops check;
+    // 64-127: piece at i-64 is pinning something
+    // to the king
     char w_attacking[64];
     char b_attacking[64];
     int under_check;

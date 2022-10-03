@@ -174,11 +174,14 @@ static inline void move_list_add_verify(MOVE_LIST* move_list, CHESS* chess,
     char* attacking =
         chess->turn == 1 ? chess->b_attacking : chess->w_attacking;
     char king = chess->turn == 1 ? 'K' : 'k';
-    if (attacking[start] == 2) return;  // if cur piece is pinned
+    if (attacking[start] >= 64 &&  // attacking[start] < 128 &&
+        attacking[end] != attacking[start])
+        return;  // if cur piece is pinned
     // if king moves to dangerous spot
     if (chess->board[start] == king && attacking[end] != 0) return;
     // if king is under check and we try to ignore it
-    if (chess->under_check && chess->board[start] != 'k' && attacking[end] != 3)
+    if (chess->under_check && chess->board[start] != king &&
+        attacking[end] != 3)
         return;
     // TODO: Verify en passant pinning
 
@@ -248,19 +251,22 @@ static inline void chess_update_attacking_squares(CHESS* chess) {
     char* attacking =
         chess->turn == 1 ? chess->b_attacking : chess->w_attacking;
     char king = chess->turn == 1 ? 'K' : 'k';
+    for (int i = 0; i < 64; i++) attacking[i] = 0;
     for (int i = 0; i < 64; i++) {
         if (is_owner(chess->board[i], -chess->turn)) {
             char c = chess->board[i];
             if (c == 'K' || c == 'k')
                 for (int dir = 0; dir < 8; dir++) {
-                    if (num_squares_to_edge[i][dir] > 0)
+                    if (num_squares_to_edge[i][dir] > 0 &&
+                        attacking[i + dir_offsets[dir]] == 0)
                         attacking[i + dir_offsets[dir]] = 1;
                 }
             else if (c == 'N' || c == 'n') {
                 for (int dir = 0; dir < 8; dir++) {
                     int x = i % 8 + KNIGHT_MOVE[dir][0];
                     int y = i / 8 + KNIGHT_MOVE[dir][1];
-                    if (x >= 0 && x <= 7 && y >= 0 && y <= 7)
+                    if (x >= 0 && x <= 7 && y >= 0 && y <= 7 &&
+                        attacking[x + 8 * y] == 0)
                         attacking[x + 8 * y] = 1;
                     if (chess->board[x + 8 * y] == king) {
                         attacking[i] = 3;
@@ -271,14 +277,16 @@ static inline void chess_update_attacking_squares(CHESS* chess) {
                 int dir = chess->turn == 1 ? 4 : 0;  // reversed for pawns
                 int forward_i = i + dir_offsets[dir];
                 if (i % 8 != 7) {
-                    attacking[forward_i + 1] = 1;
+                    if (attacking[forward_i + 1] == 0)
+                        attacking[forward_i + 1] = 1;
                     if (chess->board[forward_i + 1] == king) {
                         attacking[i] = 3;
                         chess->under_check = 1;
                     }
                 }
                 if (i % 8 != 0) {
-                    attacking[i + dir_offsets[dir] - 1] = 1;
+                    if (attacking[forward_i - 1] == 0)
+                        attacking[i + dir_offsets[dir] - 1] = 1;
                     if (chess->board[forward_i - 1] == king) {
                         attacking[i] = 3;
                         chess->under_check = 1;
@@ -289,44 +297,48 @@ static inline void chess_update_attacking_squares(CHESS* chess) {
                 int dir_increment = (c == 'Q' || c == 'q') ? 1 : 2;
 
                 for (int dir = start_dir_index; dir < 8; dir += dir_increment) {
-                    int attacked_piece = -1;  // index of first attacked piece
+                    int critical_piece = -1;  // check or pin
+                    int is_critical = 0;
                     for (int n = 0; n < num_squares_to_edge[i][dir]; n++) {
                         int target_square = i + dir_offsets[dir] * (n + 1);
                         char target_piece = chess->board[target_square];
                         if (target_piece != NON) {
                             if (target_piece == king) {
-                                attacked_piece = target_square;
-                                chess->under_check = 1;
+                                is_critical = 1;
+                                if (critical_piece == -1) {
+                                    chess->under_check = 1;
+                                    critical_piece = target_square;
+                                    for (n++; n < num_squares_to_edge[i][dir];
+                                         n++) {
+                                        attacking[i + dir_offsets[dir] *
+                                                          (n + 1)] = 2;
+                                    }
+                                    if (!attacking[target_square])
+                                        attacking[target_square] = 1;
+                                }
+                                break;
                             }
-                            break;
+                            if (critical_piece != -1) {
+                                critical_piece = -1;
+                                break;
+                            }
+                            critical_piece = target_square;
+                            if (!attacking[target_square])
+                                attacking[target_square] = 1;
+                        } else {
+                            if (critical_piece == -1)
+                                if (!attacking[target_square])
+                                    attacking[target_square] = 1;
                         }
                     }
+                    if (!is_critical) continue;
+                    int attacking_val =
+                        chess->board[critical_piece] == king ? 3 : i + 64;
 
-                    if (attacked_piece != -1) {  // If king is being attacked
-                        for (int n = 0; n <= num_squares_to_edge[i][dir]; n++) {
-                            int critical_square = i + dir_offsets[dir] * n;
-                            if (critical_square == attacked_piece) return;
-                            attacking[critical_square] = 3;
-                        }
-                        printf("Should not reach here\n");
-                        exit(1);
-                    }
-
-                    for (int n = 0; n < num_squares_to_edge[i][dir]; n++) {
-                        int target_square = i + dir_offsets[dir] * (n + 1);
-                        char target_piece = chess->board[target_square];
-                        if (attacked_piece == -1) {
-                            attacking[target_square] = 1;
-                            if (target_piece != NON)
-                                attacked_piece = target_square;
-                            continue;
-                        }
-
-                        if (target_piece != NON) {
-                            if (target_piece == (chess->turn == 1 ? 'K' : 'k'))
-                                attacking[attacked_piece] = 2;
-                            break;
-                        }
+                    for (int n = 0; n <= num_squares_to_edge[i][dir]; n++) {
+                        int target_square = i + dir_offsets[dir] * n;
+                        attacking[target_square] = attacking_val;
+                        if (target_square == critical_piece) break;
                     }
                 }
             }
